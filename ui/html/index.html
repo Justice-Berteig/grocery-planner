@@ -3,11 +3,24 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=content-width, initial-scale=1.0">
-        <title>Go Webserver Test</title>
-        <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js" integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz" crossorigin="anonymous"></script>
+        <title>Grocery Planner</title>
+        <script
+            src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"
+            integrity="sha384-/TgkGk7p307TH7EXJDuUlgG3Ce1UVolAOFopFekQkkXihi5u/6OCvVKyz1W+idaz"
+            crossorigin="anonymous"
+        ></script>
         <link rel="stylesheet" href="/static/stylesheets/main.css">
     </head>
     <body>
-        <h1>Hello HTML</h1>
+        <h1>HELLO</h1>
+        <main>
+            <div id="controls">
+            </div>
+            <div id="grocery-stores">
+                {{ range .GroceryStores }}
+                    {{ template "grocery-store" . }}
+                {{ end }}
+            </div>
+        </main>
     </body>
 </html>

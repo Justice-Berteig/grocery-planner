@@ -1,3 +1,31 @@
+/*
+ * ===========================================================
+ * = Generic styles to get rid of some undesireable defaults =
+ * ===========================================================
+ */
+
+html {
+    all       : unset;
+    box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: inherit;
+    margin    : 0px;
+    padding   : 0px;
+}
+
 body {
-    background-color: red;
+    min-height: 100vh;
+}
+
+/*
+ * ==================
+ * = Define colours =
+ * ==================
+ */
+
+:root {
 }
