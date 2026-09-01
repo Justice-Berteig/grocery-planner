@@ -19,68 +19,79 @@ type GroceryStore struct {
 
 type GroceryItem struct {
 	Name     string
-	quantity int
+	Quantity int
 }
 
 
-func createTable(db *sql.DB) {
+func createTables(db *sql.DB) {
 	query := `
-	CREATE TABLE IF NOT EXISTS testTable (
-		id PRIMARY KEY,
-		name VARCHAR(20) NOT NULL
+	CREATE TABLE IF NOT EXISTS groceryStores (
+		id   INTEGER     PRIMARY KEY,
+		name VARCHAR(64) NOT NULL
 	)`
 
 	_, err := db.Exec(query)
 	if err != nil {
 		log.Fatal(err)
 	}
-}
 
+	query = `
+	CREATE TABLE IF NOT EXISTS groceryItems (
+		id       INTEGER     PRIMARY KEY,
+		quantity INTEGER     DEFAULT 0,
+		name     VARCHAR(64) NOT NULL,
+		store    INTEGER,
 
-func addToTable(db *sql.DB) {
-	query := `
-	INSERT INTO testTable (
-		id,
-		name
-	)
-	VALUES (
-		1,
-		"Justice"
+		FOREIGN KEY(store) REFERENCES groceryStore(id)
 	)`
 
-	_, err := db.Exec(query)
+	_, err = db.Exec(query)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
 
-func readFromTable(db *sql.DB) string {
-	var id int
-	var name string
-
+func addGroceryStore(db *sql.DB, store GroceryStore) {
+	// First check if store exists.
 	query := `
-	SELECT * FROM testTable
+	SELECT FROM groceryStores
+	WHERE name = $1
 	`
 
-	err := db.QueryRow(query).Scan(&id, &name)
+	res, err := db.Exec(query, store.Name)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	return name
+	log.Println(res)
 }
 
 
-func deleteTable(db *sql.DB) {
+func addGroceryItem(db *sql.DB, item GroceryItem) {
 	query := `
-	DROP TABLE IF EXISTS testTable
+	SELECT FROM groceryItems
+	WHERE name = $1
 	`
 
-	_, err := db.Exec(query)
+	res, err := db.Exec(query, item.Name)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Println(res)
+}
+
+
+func readFromTable(db *sql.DB, tableName string) *sql.Rows {
+	query := `
+	SELECT * FROM $1
+	`
+
+	rows, err := db.Query(query, tableName)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return rows
 }
 
 
@@ -99,14 +110,18 @@ func main() {
 	fmt.Println("Done!")
 
 	fmt.Println("Testing database...")
-	createTable(db)
-	addToTable(db)
-	res := readFromTable(db)
-	fmt.Println(res)
-	deleteTable(db)
-	fmt.Println("DONE!")
+	createTables(db)
+
+
+
+
+	rows := readFromTable(db, "GroceryStores")
+	fmt.Println(rows)
+	rows = readFromTable(db, "GroceryItems")
+	fmt.Println(rows)
 
 	http.HandleFunc( "GET /{$}", indexHandler)
+	http.HandleFunc( "POST /add-item/{$}", indexHandler)
 
 	fmt.Println("Starting server on port 8000...")
 	log.Fatal(http.ListenAndServe(":8000", nil))
@@ -126,4 +141,10 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 		"ui/html/grocery-store.html",
 	))
 	tmpl.Execute(writer, data)
+}
+
+
+func addItemHandler(writer http.ResponseWriter, request *http.Request) {
+	itemName := request.PostFormValue("item-name")
+	storeName := request.PostFormValue("store-name")
 }

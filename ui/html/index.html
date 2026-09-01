@@ -12,10 +12,43 @@
         <link rel="stylesheet" href="/static/stylesheets/main.css">
     </head>
     <body>
-        <h1>HELLO</h1>
         <main>
-            <div id="controls">
-            </div>
+            <h1>
+                Add to the list:
+            </h1>
+            <form
+                id="add-item"
+                hx-post="/add-item/"
+            >
+                <input
+                    type="text"
+                    id="item-input"
+                    name="item-name"
+                    list="item-suggestions"
+                >
+                <datalist id="item-suggestions">
+                    {{ range .GroceryStores }}
+                        {{ range .Groceries }}
+                            <option value="{{ .Name }}">
+                        {{ end }}
+                    {{ end }}
+                </datalist>
+                <input
+                    type="text"
+                    id="store-input"
+                    name="store-name"
+                    list="store-suggestions"
+                >
+                <datalist id="store-suggestions">
+                    {{ range .GroceryStores }}
+                        <option value="{{ .Name }}">
+                    {{ end }}
+                </datalist>
+                <button type="submit">Add</button>
+            </form>
+            <h2>
+                The list:
+            </h2>
             <div id="grocery-stores">
                 {{ range .GroceryStores }}
                     {{ template "grocery-store" . }}

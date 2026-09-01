@@ -1,10 +1,9 @@
 {{ define "grocery-store" }}
 <div class="grocery-store">
-    <p>Here is a grocery store</p>
-    <p>{{ .Name }}</p>
+    <h3>{{ .Name }}</h3>
     <div class="grocery-list">
         {{ range .Groceries }}
-        <p>{{ . }}</p>
+        <p>{{ .Quantity }} - {{ .Name }}</p>
         {{ end }}
     </div>
 </div>
