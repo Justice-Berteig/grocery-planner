@@ -23,6 +23,22 @@ type GroceryItem struct {
 }
 
 
+var tableNames = [2]string{
+	"groceryStores",
+	"groceryItems",
+}
+
+
+func arrayContainsValue(arr []string, val string) bool {
+	for i := 0; i < len(arr); i++ {
+		if val == arr[i] {
+			return true
+		}
+	}
+	return false
+}
+
+
 func createTables(db *sql.DB) {
 	query := `
 	CREATE TABLE IF NOT EXISTS groceryStores (
@@ -55,8 +71,10 @@ func createTables(db *sql.DB) {
 func addGroceryStore(db *sql.DB, store GroceryStore) {
 	// First check if store exists.
 	query := `
-	SELECT FROM groceryStores
-	WHERE name = $1
+	INSERT INTO groceryStores
+	( name )
+	VALUES
+	( ? )
 	`
 
 	res, err := db.Exec(query, store.Name)
@@ -69,8 +87,10 @@ func addGroceryStore(db *sql.DB, store GroceryStore) {
 
 func addGroceryItem(db *sql.DB, item GroceryItem) {
 	query := `
-	SELECT FROM groceryItems
-	WHERE name = $1
+	INSERT INTO groceryItems
+	( quantity, name, store )
+	VALUES
+	( 10, ?, 100 )
 	`
 
 	res, err := db.Exec(query, item.Name)
@@ -82,9 +102,13 @@ func addGroceryItem(db *sql.DB, item GroceryItem) {
 
 
 func readFromTable(db *sql.DB, tableName string) *sql.Rows {
+	if !arrayContainsValue(tableNames[0:len(tableNames)], tableName) {
+		log.Fatal("ERROR (readFromTable): Invalid table name " + tableName)
+	}
+
 	query := `
-	SELECT * FROM $1
-	`
+	SELECT * FROM 
+	` + tableName
 
 	rows, err := db.Query(query, tableName)
 	if err != nil {
@@ -110,15 +134,31 @@ func main() {
 	fmt.Println("Done!")
 
 	fmt.Println("Testing database...")
+	fmt.Println("Creating database...")
 	createTables(db)
 
 
 
 
-	rows := readFromTable(db, "GroceryStores")
+	fmt.Println("Reading from groceryStores...")
+	rows := readFromTable(db, "groceryStores")
+	fmt.Println(rows) // ROWS DON'T WORK LIKE THIS GOTTA DO SOMETHING ELSE
+	fmt.Println("Reading from groceryItems...")
+	rows = readFromTable(db, "groceryItems")
 	fmt.Println(rows)
-	rows = readFromTable(db, "GroceryItems")
+
+	addGroceryStore(db, GroceryStore{ "TestStore", []GroceryItem{} })
+	addGroceryItem(db, GroceryItem{ "TestItem", 10 })
+
+	fmt.Println("Reading from groceryStores...")
+	rows = readFromTable(db, "groceryStores")
 	fmt.Println(rows)
+	fmt.Println("Reading from groceryItems...")
+	rows = readFromTable(db, "groceryItems")
+	fmt.Println(rows)
+
+
+
 
 	http.HandleFunc( "GET /{$}", indexHandler)
 	http.HandleFunc( "POST /add-item/{$}", indexHandler)
@@ -147,4 +187,6 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 func addItemHandler(writer http.ResponseWriter, request *http.Request) {
 	itemName := request.PostFormValue("item-name")
 	storeName := request.PostFormValue("store-name")
+	log.Println(itemName)
+	log.Println(storeName)
 }
