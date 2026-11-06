@@ -6,9 +6,16 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+
+type Database struct {
+	Instance *sql.DB
+}
+var database = Database{ nil }
 
 
 type GroceryStore struct {
@@ -41,10 +48,11 @@ func arrayContainsValue(arr []string, val string) bool {
 
 func createTables(db *sql.DB) {
 	query := `
+	DROP TABLE IF EXISTS groceryStores;
 	CREATE TABLE IF NOT EXISTS groceryStores (
 		id   INTEGER     PRIMARY KEY,
 		name VARCHAR(64) NOT NULL
-	)`
+	);`
 
 	_, err := db.Exec(query)
 	if err != nil {
@@ -52,14 +60,15 @@ func createTables(db *sql.DB) {
 	}
 
 	query = `
+	DROP TABLE IF EXISTS groceryItems;
 	CREATE TABLE IF NOT EXISTS groceryItems (
 		id       INTEGER     PRIMARY KEY,
 		quantity INTEGER     DEFAULT 0,
 		name     VARCHAR(64) NOT NULL,
-		store    INTEGER,
+		store    INTEGER     NOT NULL,
 
-		FOREIGN KEY(store) REFERENCES groceryStore(id)
-	)`
+		FOREIGN KEY (store) REFERENCES groceryStore(id)
+	);`
 
 	_, err = db.Exec(query)
 	if err != nil {
@@ -77,11 +86,10 @@ func addGroceryStore(db *sql.DB, store GroceryStore) {
 	( ? )
 	`
 
-	res, err := db.Exec(query, store.Name)
+	_, err := db.Exec(query, store.Name)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(res)
 }
 
 
@@ -93,29 +101,53 @@ func addGroceryItem(db *sql.DB, item GroceryItem) {
 	( 10, ?, 100 )
 	`
 
-	res, err := db.Exec(query, item.Name)
+	_, err := db.Exec(query, item.Name)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(res)
 }
 
 
-func readFromTable(db *sql.DB, tableName string) *sql.Rows {
-	if !arrayContainsValue(tableNames[0:len(tableNames)], tableName) {
-		log.Fatal("ERROR (readFromTable): Invalid table name " + tableName)
-	}
-
+func printGroceryStoresTable(db *sql.DB) {
 	query := `
-	SELECT * FROM 
-	` + tableName
+	SELECT * FROM groceryStores
+	`
 
-	rows, err := db.Query(query, tableName)
+	rows, err := db.Query(query)
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer rows.Close()
 
-	return rows
+	cols, err := rows.Columns()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%-20s", "")
+	for _, val := range cols {
+		fmt.Printf("%-20s", val)
+	}
+	fmt.Println()
+
+	var id   string
+	var name string
+	index := 1
+	for rows.Next() {
+		fmt.Printf("%-20s", strconv.Itoa(index))
+
+		if err := rows.Scan(&id, &name); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%-20s%-20s\n", id, name)
+
+		index += 1
+	}
+	// Check for errors from iterating over rows.
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println()
 }
 
 
@@ -127,10 +159,12 @@ func main() {
 
 	fmt.Print("Opening database...")
 	db, err := sql.Open("sqlite3", "./groceries.db")
-	defer db.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
+	database.Instance = db
+	defer db.Close()
+	defer func() { database.Instance = nil }()
 	fmt.Println("Done!")
 
 	fmt.Println("Testing database...")
@@ -139,29 +173,19 @@ func main() {
 
 
 
-
-	fmt.Println("Reading from groceryStores...")
-	rows := readFromTable(db, "groceryStores")
-	fmt.Println(rows) // ROWS DON'T WORK LIKE THIS GOTTA DO SOMETHING ELSE
-	fmt.Println("Reading from groceryItems...")
-	rows = readFromTable(db, "groceryItems")
-	fmt.Println(rows)
+	printGroceryStoresTable(database.Instance)
 
 	addGroceryStore(db, GroceryStore{ "TestStore", []GroceryItem{} })
+	addGroceryStore(db, GroceryStore{ "Meep Mart", []GroceryItem{} })
+	addGroceryStore(db, GroceryStore{ "Blue", []GroceryItem{} })
 	addGroceryItem(db, GroceryItem{ "TestItem", 10 })
 
-	fmt.Println("Reading from groceryStores...")
-	rows = readFromTable(db, "groceryStores")
-	fmt.Println(rows)
-	fmt.Println("Reading from groceryItems...")
-	rows = readFromTable(db, "groceryItems")
-	fmt.Println(rows)
+	printGroceryStoresTable(database.Instance)
 
 
 
-
-	http.HandleFunc( "GET /{$}", indexHandler)
-	http.HandleFunc( "POST /add-item/{$}", indexHandler)
+	http.HandleFunc( "GET /{$}"          , indexHandler  )
+	http.HandleFunc( "POST /add-item/{$}", addItemHandler)
 
 	fmt.Println("Starting server on port 8000...")
 	log.Fatal(http.ListenAndServe(":8000", nil))
@@ -171,8 +195,8 @@ func main() {
 func indexHandler(writer http.ResponseWriter, request *http.Request) {
 	data := map[string][]GroceryStore {
 		"GroceryStores": {
-			GroceryStore{ "Costco", []GroceryItem{GroceryItem{"Apple", 12 } , GroceryItem{ "Banana", 6 }} },
-			GroceryStore{ "T&T"   , []GroceryItem{GroceryItem{ "Cereal", 1 }, GroceryItem{ "Bread", 2 }} },
+			GroceryStore{ "Costco", []GroceryItem{GroceryItem{"Apple"  , 12 }, GroceryItem{ "Banana", 6 }} },
+			GroceryStore{ "T&T"   , []GroceryItem{GroceryItem{ "Cereal",  1 }, GroceryItem{ "Bread" , 2 }} },
 		},
 	}
 
@@ -185,8 +209,9 @@ func indexHandler(writer http.ResponseWriter, request *http.Request) {
 
 
 func addItemHandler(writer http.ResponseWriter, request *http.Request) {
-	itemName := request.PostFormValue("item-name")
+	itemName  := request.PostFormValue("item-name")
 	storeName := request.PostFormValue("store-name")
+	log.Println("Requested to add item:")
 	log.Println(itemName)
 	log.Println(storeName)
 }
