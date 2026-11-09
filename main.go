@@ -65,9 +65,9 @@ func createTables(db *sql.DB) {
 		id       INTEGER     PRIMARY KEY,
 		quantity INTEGER     DEFAULT 0,
 		name     VARCHAR(64) NOT NULL,
-		store    INTEGER     NOT NULL,
+		storeID  INTEGER     NOT NULL,
 
-		FOREIGN KEY (store) REFERENCES groceryStore(id)
+		FOREIGN KEY (storeID) REFERENCES groceryStore(id)
 	);`
 
 	_, err = db.Exec(query)
@@ -96,12 +96,12 @@ func addGroceryStore(db *sql.DB, store GroceryStore) {
 func addGroceryItem(db *sql.DB, item GroceryItem) {
 	query := `
 	INSERT INTO groceryItems
-	( quantity, name, store )
+	( quantity, name, storeID )
 	VALUES
-	( 10, ?, 100 )
+	( ?, ?, 100 )
 	`
 
-	_, err := db.Exec(query, item.Name)
+	_, err := db.Exec(query, item.Quantity, item.Name)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -110,15 +110,23 @@ func addGroceryItem(db *sql.DB, item GroceryItem) {
 
 func printGroceryStoresTable(db *sql.DB) {
 	query := `
-	SELECT * FROM groceryStores
+	SELECT
+		store.id,
+		store.name,
+		COUNT(*) OVER (PARTITION BY item.id) AS Items
+	FROM
+		   groceryStores store INNER JOIN groceryItems item
+		ON store.id = item.storeID
 	`
 
+	// Run query and get rows
 	rows, err := db.Query(query)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer rows.Close()
 
+	// Print column names
 	cols, err := rows.Columns()
 	if err != nil {
 		log.Fatal(err)
@@ -129,16 +137,74 @@ func printGroceryStoresTable(db *sql.DB) {
 	}
 	fmt.Println()
 
-	var id   string
-	var name string
+	// Scan and print row values
+	var id        string
+	var name      string
+	var itemCount string
 	index := 1
 	for rows.Next() {
 		fmt.Printf("%-20s", strconv.Itoa(index))
 
-		if err := rows.Scan(&id, &name); err != nil {
+		if err := rows.Scan(&id, &name, &itemCount); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("%-20s%-20s\n", id, name)
+		fmt.Printf("%-20s%-20s%-20s\n", id, name, itemCount)
+
+		index += 1
+	}
+	// Check for errors from iterating over rows.
+	if err := rows.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println()
+}
+
+
+func printGroceryItemsTable(db *sql.DB) {
+	query := `
+	SELECT
+		item.id,
+		item.name,
+		item.quantity,
+		store.name AS 'Store Name'
+	FROM
+		   groceryItems item INNER JOIN groceryStores store
+		ON item.storeID = store.id
+	`
+
+	// Run query and get rows
+	rows, err := db.Query(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	// Print column names
+	cols, err := rows.Columns()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("%-20s", "")
+	for _, val := range cols {
+		fmt.Printf("%-20s", val)
+	}
+	fmt.Println()
+
+	// Scan and print row values
+	var id        string
+	var name      string
+	var quantity  string
+	var storeName string
+
+	index := 1
+	for rows.Next() {
+		fmt.Printf("%-20s", strconv.Itoa(index))
+
+		if err := rows.Scan(&id, &name, &quantity, &storeName); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("%-20s%-20s%-20s%-20s\n", id, name, quantity, storeName)
 
 		index += 1
 	}
@@ -174,13 +240,22 @@ func main() {
 
 
 	printGroceryStoresTable(database.Instance)
+	fmt.Println()
+	printGroceryItemsTable(database.Instance)
 
 	addGroceryStore(db, GroceryStore{ "TestStore", []GroceryItem{} })
 	addGroceryStore(db, GroceryStore{ "Meep Mart", []GroceryItem{} })
 	addGroceryStore(db, GroceryStore{ "Blue", []GroceryItem{} })
-	addGroceryItem(db, GroceryItem{ "TestItem", 10 })
+	addGroceryItem(db, GroceryItem{ "Apple", 5 })
+	addGroceryItem(db, GroceryItem{ "Orange", 10 })
+	addGroceryItem(db, GroceryItem{ "Cereal", 2 })
+	addGroceryItem(db, GroceryItem{ "Bread", 20 })
+	addGroceryItem(db, GroceryItem{ "Crackers", 12 })
+	addGroceryItem(db, GroceryItem{ "Chicken", 6 })
 
 	printGroceryStoresTable(database.Instance)
+	fmt.Println()
+	printGroceryItemsTable(database.Instance)
 
 
 
