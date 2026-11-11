@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"strconv"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -98,7 +97,7 @@ func addGroceryItem(db *sql.DB, item GroceryItem) {
 	INSERT INTO groceryItems
 	( quantity, name, storeID )
 	VALUES
-	( ?, ?, 100 )
+	( ?, ?, 1 )
 	`
 
 	_, err := db.Exec(query, item.Quantity, item.Name)
@@ -109,15 +108,16 @@ func addGroceryItem(db *sql.DB, item GroceryItem) {
 
 
 func printGroceryStoresTable(db *sql.DB) {
-	query := `
-	SELECT
-		store.id,
-		store.name,
-		COUNT(*) OVER (PARTITION BY item.id) AS Items
-	FROM
-		   groceryStores store INNER JOIN groceryItems item
-		ON store.id = item.storeID
-	`
+	query := `SELECT * FROM groceryStores`
+	//query := `
+	//SELECT
+	//	store.id,
+	//	store.name,
+	//	COUNT(*) OVER (PARTITION BY item.id) AS Items
+	//FROM
+	//	   groceryStores store FULL OUTER JOIN groceryItems item
+	//	ON store.id = item.storeID
+	//`
 
 	// Run query and get rows
 	rows, err := db.Query(query)
@@ -131,26 +131,21 @@ func printGroceryStoresTable(db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%-20s", "")
 	for _, val := range cols {
 		fmt.Printf("%-20s", val)
 	}
 	fmt.Println()
+	fmt.Println("-------------------------------------------------------------")
 
 	// Scan and print row values
 	var id        string
 	var name      string
-	var itemCount string
-	index := 1
+	//var itemCount string
 	for rows.Next() {
-		fmt.Printf("%-20s", strconv.Itoa(index))
-
-		if err := rows.Scan(&id, &name, &itemCount); err != nil {
+		if err := rows.Scan(&id, &name); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Printf("%-20s%-20s%-20s\n", id, name, itemCount)
-
-		index += 1
+		fmt.Printf("%-20s%-20s\n", id, name)
 	}
 	// Check for errors from iterating over rows.
 	if err := rows.Err(); err != nil {
@@ -162,16 +157,17 @@ func printGroceryStoresTable(db *sql.DB) {
 
 
 func printGroceryItemsTable(db *sql.DB) {
-	query := `
-	SELECT
-		item.id,
-		item.name,
-		item.quantity,
-		store.name AS 'Store Name'
-	FROM
-		   groceryItems item INNER JOIN groceryStores store
-		ON item.storeID = store.id
-	`
+	query := `SELECT * FROM groceryItems`
+	//query := `
+	//SELECT
+	//	item.id,
+	//	item.name,
+	//	item.quantity,
+	//	store.name AS 'Store Name'
+	//FROM
+	//	   groceryItems item INNER JOIN groceryStores store
+	//	ON item.storeID = store.id
+	//`
 
 	// Run query and get rows
 	rows, err := db.Query(query)
@@ -185,11 +181,11 @@ func printGroceryItemsTable(db *sql.DB) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%-20s", "")
 	for _, val := range cols {
 		fmt.Printf("%-20s", val)
 	}
 	fmt.Println()
+	fmt.Println("-------------------------------------------------------------")
 
 	// Scan and print row values
 	var id        string
@@ -197,16 +193,11 @@ func printGroceryItemsTable(db *sql.DB) {
 	var quantity  string
 	var storeName string
 
-	index := 1
 	for rows.Next() {
-		fmt.Printf("%-20s", strconv.Itoa(index))
-
 		if err := rows.Scan(&id, &name, &quantity, &storeName); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Printf("%-20s%-20s%-20s%-20s\n", id, name, quantity, storeName)
-
-		index += 1
 	}
 	// Check for errors from iterating over rows.
 	if err := rows.Err(); err != nil {
@@ -231,6 +222,12 @@ func main() {
 	database.Instance = db
 	defer db.Close()
 	defer func() { database.Instance = nil }()
+
+	query := `PRAGMA foregin_keys = ON;`
+	_, err = db.Exec(query)
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Println("Done!")
 
 	fmt.Println("Testing database...")
